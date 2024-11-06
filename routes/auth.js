@@ -6,8 +6,10 @@ const Token = require("../models/token")
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const bcryptSalt = require("bcryptjs");
 
-/*************************** REGISTER *******************************/
+/*************************** Register User *******************************/
 
 router.post('/register', async(req, res) => {
   let success = false;
@@ -40,7 +42,7 @@ router.post('/register', async(req, res) => {
 })
 
 
-/*************************** LOGIN *******************************/
+/*************************** Login User *******************************/
 
 router.post('/login',async(req,res)=>{
     let success = false;
@@ -79,12 +81,13 @@ router.post('/RequestPasswordChange',async(req,res)=>{
         if(!user){
             return res.status(400).json({success,message : "user doesnot exists"})
         }
-        let token = await Token.findOne({email : email});
+        let token = await Token.findOne({userId:user.id});
         if(token){
             await token.deleteOne();
         }
         let resetToken = crypto.randomBytes(32).toString("hex");
-        const hash = await bcrypt.hash(resetToken, Number(bcryptSalt));
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(resetToken,salt);
 
         await new Token({
             userId : user._id,
@@ -92,7 +95,7 @@ router.post('/RequestPasswordChange',async(req,res)=>{
             createdAt: Date.now(),
           }).save();
         
-
+        const clientURL = "https://localhost:3000";
         const link = `${clientURL}/passwordReset?token=${resetToken}&id=${user._id}`;
 
         const Password = process.env.GOOGLEPASSWORD;
@@ -141,7 +144,7 @@ router.post('/ResetPassword',async(req,res)=>{
     const {userId,password,token} = req.body;
     let success = false;
     try{
-        let user = await User.findOne({userId});
+        let user = await User.findById(userId);
         if(!user){
             return res.status(400).json({success,message : "user doesnot exists"})
         }
@@ -160,6 +163,7 @@ router.post('/ResetPassword',async(req,res)=>{
         const secPass = await bcrypt.hash(req.body.password,salt);
         
         user.password = secPass;
+        await user.save();
         const data = {
             user : {
                id : user.id
