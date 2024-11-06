@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const User = require("../models/user")
+const Token = require("../models/token")
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 const bcrypt = require('bcryptjs');
@@ -69,34 +70,47 @@ router.post('/login',async(req,res)=>{
 
 
 
-/*************************** Forget password *******************************/
+/*************************** Request Password Change *******************************/
 
-router.post('/ForgotPassword',async(req,res)=>{
+router.post('/RequestPasswordChange',async(req,res)=>{
     const {email} = req.body;
     try {
+        const user = await User.findOne({email : email});
+        if(!user){
+            return res.status(400).json({success,message : "user doesnot exists"})
+        }
+        let token = await Token.findOne({email : email});
+        if(token){
+            await token.deleteOne();
+        }
+        let resetToken = crypto.randomBytes(32).toString("hex");
+        const hash = await bcrypt.hash(resetToken, Number(bcryptSalt));
+
+        await new Token({
+            userId : user._id,
+            token: hash,
+            createdAt: Date.now(),
+          }).save();
+        
+
+        const link = `${clientURL}/passwordReset?token=${resetToken}&id=${user._id}`;
+
         const Password = process.env.GOOGLEPASSWORD;
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                user: '/',
+                user: process.env.EMAIL,
                 pass: Password,
             },
         });
 
-        const otpLength = 6;
-        const otp = Math.floor(Math.random() * Math.pow(10, otpLength))
-            .toString()
-            .padStart(otpLength, '0');
-
-        req.session.otp = otp;
         const mailOptions = {
-            from: '/',
+            from: process.env.EMAIL,
             to: email,
-            subject: 'OTP For resetting the password',
+            subject: 'Password reset request',
             html: `
     <p>Hello,</p>
-    <p>Your Book Bank password reset code is: <strong>${otp}</strong>.</p>
-    <p>Enter this code within the app to reset password</p>
+    <p>Your Book Bank password reset link is : <a>${link}</a>.</p>
     <p>Thank you,<br>Book Bank Team</p>
   `,
         };
@@ -104,9 +118,9 @@ router.post('/ForgotPassword',async(req,res)=>{
         console.log(result);
         return res.status(200).json({
             success: true,
-            message: 'OTP Sent successfully',
+            message: 'message sent sucessfully',
             data: {
-                otp: otp,
+                link : link
             },
         });
 
@@ -121,24 +135,36 @@ router.post('/ForgotPassword',async(req,res)=>{
 });
 
 
-/*************************** change Password *******************************/
+/*************************** Reset Password *******************************/
 
 router.post('/ResetPassword',async(req,res)=>{
+    const {userId,password,token} = req.body;
     let success = false;
     try{
-        let user = await User.findOne({email: req.body.email});
+        let user = await User.findOne({userId});
         if(!user){
             return res.status(400).json({success,message : "user doesnot exists"})
-          }
+        }
+
+        let passwordResetToken = await Token.findOne({userId});
+        if(!passwordResetToken){
+            throw new Error("Invalid or expired password reset token");
+        }
+
+        const isValid = await bcrypt.compare(token, passwordResetToken.token);
+        if (!isValid) {
+          throw new Error("Invalid or expired password reset token");
+        }
+
         const salt = await bcrypt.genSalt(10);
-        const secPass = await bcrypt.hash(req.body.newPassword,salt);
+        const secPass = await bcrypt.hash(req.body.password,salt);
+        
         user.password = secPass;
         const data = {
             user : {
                id : user.id
             }
           }
-          success = true;
           const authtoken = jwt.sign(data,JWT_SECRET);
           success = true;
           res.json({success,authtoken});  
@@ -148,3 +174,6 @@ router.post('/ResetPassword',async(req,res)=>{
         res.status(500).send("some error occured");
     }
 })
+
+
+module.exports = router;
