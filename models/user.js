@@ -10,6 +10,13 @@ const UserSchema = new Schema({
             status: { type: String, required: true },
             id: { type: Schema.Types.ObjectId, ref: 'book', required: true }
         }
+    ],
+    requestHistory:[
+         {
+            completed: {type:book,default:false},
+            requestedBy:{type: Schema.Types.ObjectId, ref: 'user'},
+            message:{type:String}
+         }
     ]
 })
 
