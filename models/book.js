@@ -7,7 +7,7 @@ const BookSchema = new Schema({
     author: { type: String, required: true },
     status: { 
         type: String,
-        enum: ['available', 'requested', 'own'],
+        enum: ['available', 'own'],
         default: 'own'
     },
     genre: { type: String },
@@ -15,7 +15,7 @@ const BookSchema = new Schema({
     coverImageUrl: { type: String },
     createdAt: { type: Date, default: Date.now },
     condition: {type : String,required: true},
-    requestedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }]
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user' }
 })
 
 const BookModel = model('Books', BookSchema);

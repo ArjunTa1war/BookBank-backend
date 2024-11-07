@@ -5,7 +5,7 @@ const UserSchema = new Schema({
     name: { type: String, required: true},
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    books : [
+    RequestedBooks : [
         {
             status: { type: String, required: true },
             id: { type: Schema.Types.ObjectId, ref: 'book', required: true }
